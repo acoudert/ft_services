@@ -1,3 +1,0 @@
-function general_instruction() {
-	
-}
