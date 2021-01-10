@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: phpmyadmin-deployment
+  labels:
+    app: phpmyadmin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: phpmyadmin
+  template:
+    metadata:
+      labels:
+        app: phpmyadmin
+    spec:
+      restartPolicy: Always
+      containers:
+      - name: phpmyadmin
+        image: phpmyadmin:0.0
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - /tmp/liveness.sh
+          initialDelaySeconds: 120
+          periodSeconds: 10
+        ports:
+        - containerPort: 5000
+        env:
+        - name: USER_SVC
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_phpmyadmin
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_phpmyadmin
+        - name: USER_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_influxdb
+        - name: PASS_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_influxdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: phpmyadmin-service
+  annotations:
+    metallb.universe.tf/allow-shared-ip: sharedIP
+spec:
+  type: LoadBalancer
+  selector:
+    app: phpmyadmin
+  ports:
+  - name: https
+    protocol: TCP
+    port: 5000
+    targetPort: 5000

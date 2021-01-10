@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      restartPolicy: Always
+      containers:
+      - name: nginx
+        image: nginx:0.0
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - /tmp/liveness.sh
+          initialDelaySeconds: 120
+          periodSeconds: 10
+        ports:
+        - containerPort: 22
+        - containerPort: 80
+        - containerPort: 443
+        env:
+        - name: USER_SVC
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_nginx
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_nginx
+        - name: USER_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_influxdb
+        - name: PASS_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_influxdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  annotations:
+    metallb.universe.tf/allow-shared-ip: sharedIP
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx
+  ports:
+  - name: ssh
+    protocol: TCP
+    port: 22
+    targetPort: 22
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: 443

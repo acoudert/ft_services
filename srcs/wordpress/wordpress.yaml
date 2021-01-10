@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress-deployment
+  labels:
+    app: wordpress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      restartPolicy: Always
+      containers:
+      - name: wordpress
+        image: wordpress:0.0
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - /tmp/liveness.sh
+          initialDelaySeconds: 120
+          periodSeconds: 10
+        ports:
+        - containerPort: 5050
+        env:
+        - name: ADMIN_DB
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_wordpress_db
+        - name: PASSWORD_DB
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_wordpress_db
+        - name: USER_ADMIN
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_wordpress_admin
+        - name: PASS_ADMIN
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_wordpress_admin
+        - name: USER_EDITOR
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_wordpress_editor
+        - name: PASS_EDITOR
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_wordpress_editor
+        - name: USER_AUTHOR
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_wordpress_author
+        - name: PASS_AUTHOR
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_wordpress_author
+        - name: USER_CONTRIBUTOR
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_wordpress_contributor
+        - name: PASS_CONTRIBUTOR
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_wordpress_contributor
+        - name: USER_SUBSCRIBER
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_wordpress_subscriber
+        - name: PASS_SUBSCRIBER
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_wordpress_subscriber
+        - name: USER_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_influxdb
+        - name: PASS_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_influxdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-service
+  annotations:
+    metallb.universe.tf/allow-shared-ip: sharedIP
+spec:
+  type: LoadBalancer
+  selector:
+    app: wordpress
+  ports:
+  - name: https
+    protocol: TCP
+    port: 5050
+    targetPort: 5050

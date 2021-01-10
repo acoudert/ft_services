@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ftps-deployment
+  labels:
+    app: ftps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ftps
+  template:
+    metadata:
+      labels:
+        app: ftps
+    spec:
+      restartPolicy: Always
+      containers:
+      - name: ftps
+        image: ftps:0.0
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - /tmp/liveness.sh
+          initialDelaySeconds: 120
+          periodSeconds: 10
+        ports:
+        - containerPort: 21
+        - containerPort: 10000
+        env:
+        - name: USER_SVC
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_ftps
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_ftps
+        - name: USER_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_influxdb
+        - name: PASS_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_influxdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ftps-service
+  annotations:
+    metallb.universe.tf/allow-shared-ip: sharedIP
+spec:
+  type: LoadBalancer
+  selector:
+    app: ftps
+  ports:
+  - name: ftps-listener
+    protocol: TCP
+    port: 21
+    targetPort: 21
+  - name: ftps-pasv
+    protocol: TCP
+    port: 10000
+    targetPort: 10000

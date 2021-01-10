@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: grafanadb-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 3Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /tmp/grafanadb-pv
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafanadb-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-deployment
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      volumes:
+        - name: grafanadb-pvc
+          persistentVolumeClaim:
+            claimName: grafanadb-claim
+      restartPolicy: Always
+      containers:
+      - name: grafana
+        image: grafana:0.0
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - /tmp/liveness.sh
+          initialDelaySeconds: 120
+          periodSeconds: 10
+        ports:
+        - containerPort: 3000
+        env:
+        - name: USER_SVC
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_grafana
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_grafana
+        - name: USER_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_influxdb
+        - name: PASS_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_influxdb
+        volumeMounts:
+          - mountPath: /usr/share/grafana/data
+            name: grafanadb-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  annotations:
+    metallb.universe.tf/allow-shared-ip: sharedIP
+spec:
+  type: LoadBalancer
+  selector:
+    app: grafana
+  ports:
+  - name: https
+    protocol: TCP
+    port: 3000
+    targetPort: 3000

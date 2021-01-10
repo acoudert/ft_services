@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mariadb-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /tmp/mariadb-pv
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mariadb-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb-statefulset
+  labels:
+    app: mariadb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+  serviceName: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      volumes:
+        - name: mariadb-pvc
+          persistentVolumeClaim:
+            claimName: mariadb-claim
+      restartPolicy: Always
+      containers:
+      - name: mariadb
+        image: mariadb:0.0
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - /tmp/liveness.sh
+          initialDelaySeconds: 120
+          periodSeconds: 10
+        ports:
+        - containerPort: 3306
+        env:
+        - name: USER_SVC
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_mariadb
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_mariadb
+        - name: USER_WP
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_wordpress_db
+        - name: PASSWORD_WP
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_wordpress_db
+        - name: USER_PMA
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_phpmyadmin
+        - name: PASSWORD_PMA
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_phpmyadmin
+        - name: USER_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_influxdb
+        - name: PASS_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_influxdb
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: mariadb-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-service
+spec:
+  type: ClusterIP
+  selector:
+    app: mariadb
+  ports:
+  - name: sql
+    protocol: TCP
+    port: 3306
+    targetPort: 3306

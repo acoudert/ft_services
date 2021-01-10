@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: influxdb-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /tmp/influxdb-pv
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: influxdb-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: influxdb-statefulset
+  labels:
+    app: influxdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: influxdb
+  serviceName: influxdb
+  template:
+    metadata:
+      labels:
+        app: influxdb
+    spec:
+      volumes:
+        - name: influxdb-pvc
+          persistentVolumeClaim:
+            claimName: influxdb-claim
+      restartPolicy: Always
+      containers:
+      - name: influxdb
+        image: influxdb:0.0
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - /tmp/liveness.sh
+          initialDelaySeconds: 120
+          periodSeconds: 10
+        ports:
+        - containerPort: 8086
+        env:
+        - name: USER_SVC
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_influxdb
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_influxdb
+        - name: USER_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: user_influxdb
+        - name: PASS_METRICS
+          valueFrom:
+            secretKeyRef:
+              name: services-secrets
+              key: pass_influxdb
+        volumeMounts:
+          - mountPath: /var/lib/influxdb
+            name: influxdb-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: influxdb-service
+spec:
+  type: ClusterIP
+  selector:
+    app: influxdb
+  ports:
+  - name: db
+    protocol: TCP
+    port: 8086
+    targetPort: 8086
